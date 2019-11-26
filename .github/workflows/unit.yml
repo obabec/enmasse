@@ -8,10 +8,9 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - uses: actions/checkout@master      
-      - continue-on-error: false
+      - uses: actions/checkout@master   
 
       - name: Install maven
         run: sudo apt install maven
@@ -20,6 +19,6 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11.0.2
-
+          
       - name: Run unit tests
         run: make
