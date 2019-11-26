@@ -21,4 +21,4 @@ jobs:
           java-version: 11.0.2
           
       - name: Run unit tests
-        run: make
+        run: mvn test
