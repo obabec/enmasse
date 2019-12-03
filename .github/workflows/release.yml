@@ -7,7 +7,6 @@ env:
   SYSTEMTEST_PROFILE: smoke
   EXTERNAL_REGISTRY: "quay.io"
   DOCKER_USER: "obabec+actions"
-  VERSION: $(grep "release.version" pom.properties| cut -d'=' -f2)
 
 on:
   push:
@@ -24,6 +23,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@master
+
+    - name: Export version
+      run: | 
+        export VERSION=$(grep "release.version" pom.properties| cut -d'=' -f2)
+        echo ${VERSION}
 
     - name: Install maven
       run: sudo apt install maven
