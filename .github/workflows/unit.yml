@@ -30,11 +30,11 @@ jobs:
       with:
         java-version: 11.0.2
 
+    - name: Run unit tests
+      run: make
+      
     - name: Collect logs
       run: ./.github/scripts/collectLogs.sh
 
     - name: Show logs
       run: tree artifacts
-
-    - name: Run unit tests
-      run: make
