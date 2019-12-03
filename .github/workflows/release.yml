@@ -73,6 +73,9 @@ jobs:
     - name: Install asciidoctor
       run: gem install asciidoctor
     
+    - name: Clean
+      run: make clean
+
     - name: Make images
       run: make SKIP_TESTS=true
       
