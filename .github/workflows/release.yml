@@ -101,7 +101,7 @@ jobs:
         path: artifacts
     
     - name: Release binaries
-      if: succcess()
+      if: success()
       run: |
         echo "Logging in to Docker Hub"
         docker login -u ${DOCKER_USER} -p ${{secrets.QUAY_PASS}} ${EXTERNAL_REGISTRY}
