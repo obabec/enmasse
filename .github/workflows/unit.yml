@@ -32,9 +32,12 @@ jobs:
 
     - name: Run unit tests
       run: make
-      
+
     - name: Collect logs
       run: ./.github/scripts/collectLogs.sh
 
     - name: Show logs
       run: tree artifacts
+
+    - name: Upload artifacts
+      run: artifacts
