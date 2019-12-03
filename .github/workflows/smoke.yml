@@ -65,7 +65,11 @@ jobs:
     - name: Smoke tests
       run: ./.travis/test.sh
 
-    - uses: actions/upload-artifact@v1
+    - name: Collect logs
+      run: ./.github/scripts/collectLogs.sh
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v1.0.0
       with:
         name: test-logs
-        path: artifacts/
+        path: artifacts
