@@ -14,7 +14,8 @@ on:
     branches:
       - master
   release:
-    types: [published,created,edited,prereleased]
+    types:
+      - published
 
 jobs:
   build:
