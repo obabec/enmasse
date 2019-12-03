@@ -1,0 +1,110 @@
+name: Smoke tests
+env:
+  DOCKER_REGISTRY: "localhost:5000"
+  TAG: "latest"
+  DOCKER_ORG: enmasse
+  KUBERNETES_NAMESPACE: "enmasse-infra"
+  SYSTEMTEST_PROFILE: smoke
+  EXTERNAL_REGISTRY: "quay.io"
+  DOCKER_USER: "obabec+actions"
+  VERSION: $(grep "release.version" pom.properties| cut -d'=' -f2)
+
+on:
+  push:
+    branches:
+      - master
+  release:
+    types: [published,created,edited,prereleased]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@master
+
+    - name: Install maven
+      run: sudo apt install maven
+
+    - name: Setup NodeJS
+      run: |
+        sudo apt-get install curl
+        curl -sL https://deb.nodesource.com/setup_13.x
+        sudo -E bash -
+        sudo apt-get install nodejs
+
+    - name: Install golang
+      run: |
+        sudo add-apt-repository ppa:longsleep/golang-backports
+        sudo apt-get update
+        sudo apt-get install golang-1.12
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11.0.2
+
+    - name: Run unit tests
+      id: unit
+      run: make
+
+    - name: Collect logs
+      run: ./.github/scripts/collectLogs.sh
+
+    - name: setup-docker
+      uses: docker-practice/actions-setup-docker@0.0.1
+    
+    - name: Minikube setup with registry
+      uses: obabec/minikube-setup-action@v0.0.4-alpha
+      with:
+        k8s-version: 1.15.0
+
+    - name: Setup Ruby environment with ruby-build
+      uses: clupprich/ruby-build-action@v1.0.0
+  
+    - name: Install maven
+      run: sudo apt install maven
+
+    - name: Setup OLM
+      run: ./.travis/setup-olm.sh
+
+    - name: Install asciidoctor
+      run: gem install asciidoctor
+    
+    - name: Make images
+      run: make SKIP_TESTS=true
+      
+    - name: Build images
+      run: make docker_build
+      
+    - name: Tag images
+      run: make docker_tag
+      
+    - name: Push images
+      run: make -j 4 docker_tag docker_push
+      
+    - name: Generate templates
+      run: make templates
+
+    - name: Smoke tests
+      id: smoke
+      run: ./.travis/test.sh
+
+    - name: Collect logs
+      run: ./.github/scripts/collectLogs.sh
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: test-logs
+        path: artifacts
+    
+    - name: Release binaries
+      if: succcess()
+      run: |
+        echo "Logging in to Docker Hub"
+        docker login -u ${DOCKER_USER} -p ${{secrets.QUAY_PASS}} ${EXTERNAL_REGISTRY}
+        echo "Pushing images to Docker Hub"
+        make docker_push
+        make TAG=${VERSION} docker_push
