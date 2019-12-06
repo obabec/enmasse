@@ -32,23 +32,20 @@ public class TemplateInfraResourceFactory implements InfraResourceFactory {
     private final String WELL_KNOWN_CONSOLE_SERVICE_NAME = "console";
 
     private final Kubernetes kubernetes;
-    private final AuthenticationServiceResolver authenticationServiceResolver;
     private final Map<String, String> env;
     private final SchemaProvider schemaProvider;
     private final Long fsGroupOverride;
 
-    public TemplateInfraResourceFactory(Kubernetes kubernetes, AuthenticationServiceResolver authenticationServiceResolver, Map<String, String> env, SchemaProvider schemaProvider) {
+    public TemplateInfraResourceFactory(Kubernetes kubernetes, Map<String, String> env, SchemaProvider schemaProvider) {
         this.kubernetes = kubernetes;
-        this.authenticationServiceResolver = authenticationServiceResolver;
         this.env = env;
         this.schemaProvider = schemaProvider;
         this.fsGroupOverride = getFsGroupOverride();
     }
 
     private void prepareParameters(AddressSpace addressSpace,
+                                   AuthenticationServiceSettings authServiceSettings,
                                    Map<String, String> parameters) {
-
-        AuthenticationServiceSettings authServiceSettings = authenticationServiceResolver.resolve(addressSpace);
 
         Optional<ConsoleService> console = schemaProvider.getSchema().findConsoleService(WELL_KNOWN_CONSOLE_SERVICE_NAME);
         if (console.isEmpty()) {
@@ -141,11 +138,11 @@ public class TemplateInfraResourceFactory implements InfraResourceFactory {
     }
 
 
-    private List<HasMetadata> createStandardInfra(AddressSpace addressSpace, StandardInfraConfig standardInfraConfig) {
+    private List<HasMetadata> createStandardInfra(AddressSpace addressSpace, StandardInfraConfig standardInfraConfig, AuthenticationServiceSettings authenticationServiceSettings) {
 
         Map<String, String> parameters = new HashMap<>();
 
-        prepareParameters(addressSpace, parameters);
+        prepareParameters(addressSpace, authenticationServiceSettings, parameters);
 
         if (standardInfraConfig.getSpec().getBroker() != null) {
             if (standardInfraConfig.getSpec().getBroker().getResources() != null) {
@@ -236,10 +233,10 @@ public class TemplateInfraResourceFactory implements InfraResourceFactory {
                 .orElse(defaultValue);
     }
 
-    private List<HasMetadata> createBrokeredInfra(AddressSpace addressSpace, BrokeredInfraConfig brokeredInfraConfig) {
+    private List<HasMetadata> createBrokeredInfra(AddressSpace addressSpace, BrokeredInfraConfig brokeredInfraConfig, AuthenticationServiceSettings authenticationServiceSettings) {
         Map<String, String> parameters = new HashMap<>();
 
-        prepareParameters(addressSpace, parameters);
+        prepareParameters(addressSpace, authenticationServiceSettings, parameters);
 
         if (brokeredInfraConfig.getSpec().getBroker() != null) {
             if (brokeredInfraConfig.getSpec().getBroker().getResources() != null) {
@@ -328,11 +325,11 @@ public class TemplateInfraResourceFactory implements InfraResourceFactory {
 
 
     @Override
-    public List<HasMetadata> createInfraResources(AddressSpace addressSpace, InfraConfig infraConfig) {
+    public List<HasMetadata> createInfraResources(AddressSpace addressSpace, InfraConfig infraConfig, AuthenticationServiceSettings authenticationServiceSettings) {
         if ("standard".equals(addressSpace.getSpec().getType())) {
-            return createStandardInfra(addressSpace, (StandardInfraConfig) infraConfig);
+            return createStandardInfra(addressSpace, (StandardInfraConfig) infraConfig, authenticationServiceSettings);
         } else if ("brokered".equals(addressSpace.getSpec().getType())) {
-            return createBrokeredInfra(addressSpace, (BrokeredInfraConfig) infraConfig);
+            return createBrokeredInfra(addressSpace, (BrokeredInfraConfig) infraConfig, authenticationServiceSettings);
         } else {
             throw new IllegalArgumentException("Unknown address space type " + addressSpace.getSpec().getType());
         }
