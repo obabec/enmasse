@@ -27,7 +27,7 @@ jobs:
 
     - name: Export version
       run: | 
-        export VERSION=$(grep "release.version" pom.properties| cut -d'=' -f2)
+        echo "::set-env name=VERSION::$(grep "release.version" pom.properties| cut -d'=' -f2)"
         echo $VERSION
 
     - name: Install maven
@@ -71,7 +71,7 @@ jobs:
       
     - name: Change docker reg
       run: |
-        export DOCKER_REGISTRY="quay.io"
+        echo "::set-env name=DOCKER_REGISTRY::quay.io"
         echo $DOCKER_REGISTRY
 
     - name: Tag images
