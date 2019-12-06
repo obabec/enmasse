@@ -8,7 +8,13 @@ env:
   EXTERNAL_REGISTRY: "quay.io"
   DOCKER_USER: "obabec+actions"
 
-on: [push]
+on:
+  push:
+    branches:
+      - master
+  release:
+    types: [published]
+
 
 jobs:
   build:
