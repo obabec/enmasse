@@ -17,6 +17,7 @@ jobs:
         curl -sL https://deb.nodesource.com/setup_13.x
         sudo -E bash -
         sudo apt-get install nodejs
+        sudo apt-get install tree
 
     - name: Install golang
       run: |
@@ -31,3 +32,12 @@ jobs:
 
     - name: Run unit tests
       run: make
+
+    - name: Collect logs
+      run: ./.github/scripts/collectLogs.sh
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: test-logs
+        path: artifacts
