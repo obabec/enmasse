@@ -81,7 +81,7 @@ jobs:
       run: make docker_tag
 
     - name: Release binaries
-      if: success()
+      if: failure()
       run: |
         echo "Logging in to Docker Hub"
         echo $DOCKER_REGISTRY
