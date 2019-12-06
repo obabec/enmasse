@@ -70,7 +70,7 @@ jobs:
       
     - name: Tag images
       env:
-        DOCKER_REGISTRY: "localhost:5000"
+        DOCKER_REGISTRY: "quay.io"
       run: make docker_tag
 
     - name: Release binaries
