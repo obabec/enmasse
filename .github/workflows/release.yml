@@ -113,5 +113,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: templates/build/enmasse-${TAG}.tgz
-        asset_name: enmasse-${TAG}.tgz
+        asset_name: enmasse-$TAG.tgz
         asset_content_type: application/gzip
