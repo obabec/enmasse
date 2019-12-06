@@ -72,7 +72,6 @@ jobs:
     - name: Change docker reg
       run: |
         echo "::set-env name=DOCKER_REGISTRY::quay.io"
-        echo $DOCKER_REGISTRY
 
     - name: Tag images
       run: make docker_tag
@@ -90,5 +89,5 @@ jobs:
         make docker_push
     
     - name: Relase ZIP
-      if: github.event == push
+      if: github.event == 'push'
       run: echo "WIN WIN"
