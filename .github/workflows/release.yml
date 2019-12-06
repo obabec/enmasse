@@ -93,5 +93,5 @@ jobs:
         make docker_push
     
     - name: Relase ZIP
-      if: github.event_name == "push"
+      if: github.event_name == 'push'
       run: echo "WIN WIN"
