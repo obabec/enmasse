@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - master
+      - actions-fix
     tags:
       - 'v*'
 
