@@ -17,6 +17,8 @@ sudo add-apt-repository ppa:longsleep/golang-backports
 sudo apt-get update
 sudo apt-get install golang-1.12
 
-
-echo "Install asciidoctor"
-gem install asciidoctor
+if [[ -v SMOKE]]
+then
+    echo "Install asciidoctor"
+    gem install asciidoctor
+fi

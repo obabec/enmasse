@@ -5,8 +5,9 @@ env:
   DOCKER_ORG: enmasse
   KUBERNETES_NAMESPACE: "enmasse-infra"
   SYSTEMTEST_PROFILE: smoke
+  SMOKE: true
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
   build:
