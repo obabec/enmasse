@@ -29,7 +29,7 @@ jobs:
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
-          java-version: ${{ ASSETPATH }}
+          java-version: ${{ env.ASSETPATH }}
 
       - name: Setup Ruby environment with ruby-build
         uses: clupprich/ruby-build-action@v1.0.0
