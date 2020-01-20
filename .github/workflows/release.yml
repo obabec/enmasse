@@ -28,7 +28,7 @@ jobs:
 
       - name: Set asset path
         run: |
-          export ASSETPATH="templates/build/enmasse-${VERSION}.tgz"
+          set ASSETPATH="templates/build/enmasse-${VERSION}.tgz"
           echo "::set-env name=ASSETPATH::$(ASSETPATH)"
 
       - name: Set up JDK 11
