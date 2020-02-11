@@ -5,7 +5,7 @@ sudo systemctl unmask docker
 sudo systemctl start docker
 sudo systemctl stop docker
 
-mkdir /mnt/docker
-ln -s /mnt/docker /var/lib/docker
+sudo mkdir /mnt/docker
+sudo ln -s /mnt/docker /var/lib/docker
 
 sudo systemctl start docker
