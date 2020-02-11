@@ -8,7 +8,7 @@ sudo mkdir /mnt/docker
 #sudo echo 'DOCKER_OPTS="-dns 8.8.8.8 -dns 8.8.4.4 -g /mnt/docker"' > /etc/default/docker
 
 sudo cat /lib/systemd/system/docker.service
-sudo sh -c "sed -i 's#ExecStart=/usr/bin/docker daemon -H fd://#ExecStart=/usr/bin/docker daemon -g /mnt/docker -H fd://#' /lib/systemd/system/docker.service"
+sudo sh -c "sed -i 's#ExecStart=/usr/bin/dockerd -H fd://#ExecStart=/usr/bin/dockerd -g /mnt/docker -H fd://#' /lib/systemd/system/docker.service"
 sudo cat /lib/systemd/system/docker.service
 
 
