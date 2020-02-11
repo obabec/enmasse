@@ -24,8 +24,11 @@ sudo systemctl stop docker
 sudo mkdir /mnt/docker
 #sudo echo 'DOCKER_OPTS="-dns 8.8.8.8 -dns 8.8.4.4 -g /mnt/docker"' > /etc/default/docker
 
-echo "Creating symlink"
+sudo sh -c "echo 'ExecStart=/usr/bin/docker daemon -g /new/path/docker -H fd://' >> /lib/systemd/system/docker.service"
 
-sudo ln -s /mnt/docker /var/lib/docker
+sudo systemctl daemon-reload
+sudo rsync -aqxP /var/lib/docker/ /mnt/docker
 
-sudo systemctl start docker
+systemctl start docker
+
+ps aux | grep -i docker | grep -v grep
