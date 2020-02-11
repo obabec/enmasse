@@ -22,7 +22,7 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io
 sudo systemctl stop docker
 
 sudo mkdir /mnt/docker
-sudo echo 'DOCKER_OPTS="-dns 8.8.8.8 -dns 8.8.4.4 -g /mnt/docker"' > /etc/default/docker
+#sudo echo 'DOCKER_OPTS="-dns 8.8.8.8 -dns 8.8.4.4 -g /mnt/docker"' > /etc/default/docker
 
 echo "Creating symlink"
 
