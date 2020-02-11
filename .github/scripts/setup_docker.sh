@@ -29,6 +29,6 @@ sudo sh -c "echo 'ExecStart=/usr/bin/docker daemon -g /new/path/docker -H fd://'
 sudo systemctl daemon-reload
 sudo rsync -aqxP /var/lib/docker/ /mnt/docker
 
-systemctl start docker
+sudo systemctl start docker
 
 ps aux | grep -i docker | grep -v grep
