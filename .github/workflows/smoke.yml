@@ -18,6 +18,7 @@ jobs:
       - name: Set version
         run: |
           echo "::set-env name=VERSION::$(grep "release.version" pom.properties| cut -d'=' -f2)"
+          df
 
       - name: setup-docker
         run: ./.github/scripts/setup_docker.sh
