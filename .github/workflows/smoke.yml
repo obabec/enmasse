@@ -39,9 +39,6 @@ jobs:
       - name: Install dependencies
         run: ./.github/scripts/install_dep.sh
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v1
-
       - name: Setup OLM
         run: ./.github/scripts/setup-olm.sh
 
