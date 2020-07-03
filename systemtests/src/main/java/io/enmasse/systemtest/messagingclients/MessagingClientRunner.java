@@ -32,7 +32,7 @@ public class MessagingClientRunner {
     Logger LOGGER;
 
     public MessagingClientRunner() {
-        LOGGER = CustomLogger.getLogger();
+        LOGGER = LoggerFactory.getLogger("testName -> " + this.getClass());
     }
 
     public List<ExternalMessagingClient> sendAndReceive(MessagingEndpoint endpoint, boolean waitReceivers, String senderAddress, String ... receiverAddresses) throws Exception {
@@ -49,7 +49,7 @@ public class MessagingClientRunner {
     public List<ExternalMessagingClient> sendAndReceive(MessagingEndpoint endpoint, boolean waitReceivers, Map<ClientArgument, Object> extraSenderArgs,
                            Map<ClientArgument, Object> extraReceiverArgs, String senderAddress, String ... receiverAddresses) throws Exception {
         int expectedMsgCount = 10;
-
+        LOGGER.warn("SHIT");
         ExecutorService executor = Executors.newFixedThreadPool(1 + receiverAddresses.length);
         List<ExternalMessagingClient> clients = new ArrayList<>();
         Endpoint e = new Endpoint(endpoint.getStatus().getHost(), getPort("AMQP", endpoint));
@@ -67,7 +67,7 @@ public class MessagingClientRunner {
                 senderClient.withAdditionalArgument(arg.getKey(), arg.getValue());
             }
         }
-
+        LOGGER.warn("NOT working!");
         for (String receiverAddress : receiverAddresses) {
             ExternalMessagingClient receiverClient = new ExternalMessagingClient(false)
                     .withClientEngine(new RheaClientReceiver())
