@@ -343,7 +343,12 @@ func (r *ReconcileMessagingEndpoint) reconcileFinalizer(ctx context.Context, log
 				client := r.clientManager.GetClient(infra)
 				err = client.DeleteEndpoint(endpoint)
 				if err != nil {
-					return reconcile.Result{}, err
+					if errors.Is(err, stateerrors.ResourceInUseError) {
+						logger.Info("[Finalizer] Endpoint is still in use, rescheduling")
+						return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+					} else {
+						return reconcile.Result{}, err
+					}
 				}
 
 				err = r.certController.DeleteEndpointCert(ctx, logger, infra, endpoint)
@@ -397,7 +402,7 @@ func (r *ReconcileMessagingEndpoint) reconcileFinalizer(ctx context.Context, log
 			return processorResult{Return: true}, err
 		}
 	}
-	return processorResult{Requeue: result.Requeue}, nil
+	return processorResult{Requeue: result.Requeue, RequeueAfter: result.RequeueAfter}, nil
 }
 
 // Reconcile the service and external resources for a given endpoint.

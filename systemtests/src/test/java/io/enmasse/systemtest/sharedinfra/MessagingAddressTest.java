@@ -14,13 +14,14 @@ import io.enmasse.systemtest.TestBase;
 import io.enmasse.systemtest.amqp.AmqpClient;
 import io.enmasse.systemtest.amqp.AmqpConnectOptions;
 import io.enmasse.systemtest.amqp.QueueTerminusFactory;
+import io.enmasse.systemtest.amqp.TerminusFactory;
 import io.enmasse.systemtest.amqp.TopicTerminusFactory;
 import io.enmasse.systemtest.framework.annotations.DefaultMessagingInfrastructure;
 import io.enmasse.systemtest.framework.annotations.DefaultMessagingProject;
 import io.enmasse.systemtest.framework.annotations.ExternalClients;
 import io.enmasse.systemtest.messagingclients.ClientArgument;
-import io.enmasse.systemtest.messagingclients.ExternalMessagingClient;
 import io.enmasse.systemtest.messaginginfra.resources.MessagingEndpointResourceType;
+import io.enmasse.systemtest.utils.AssertionUtils;
 import io.vertx.proton.ProtonClientOptions;
 import io.vertx.proton.ProtonQoS;
 import org.apache.qpid.proton.amqp.messaging.Rejected;
@@ -29,6 +30,7 @@ import org.apache.qpid.proton.message.Message;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,7 +53,7 @@ public class MessagingAddressTest extends TestBase {
     private MessagingEndpoint endpoint;
 
     @BeforeAll
-    public void createEndpoint() {
+    public void createEndpoint(ExtensionContext extensionContext) {
         project = resourceManager.getDefaultMessagingProject();
         endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -68,12 +70,12 @@ public class MessagingAddressTest extends TestBase {
                 .addToProtocols("AMQP", "AMQPS")
                 .endSpec()
                 .build();
-        resourceManager.createResource(endpoint);
+        resourceManager.createResource(extensionContext, endpoint);
     }
 
     @Test
-    public void testAnycast() throws Exception {
-        resourceManager.createResource(new MessagingAddressBuilder()
+    public void testAnycast(ExtensionContext extensionContext) throws Exception {
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("addr1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -84,12 +86,12 @@ public class MessagingAddressTest extends TestBase {
                 .endSpec()
                 .build());
         clientRunner.sendAndReceive(endpoint, "addr1", "addr1");
-        assertDefaultMessaging(clientRunner.getClients());
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
     @Test
-    public void testMulticast() throws Exception {
-        resourceManager.createResource(new MessagingAddressBuilder()
+    public void testMulticast(ExtensionContext extensionContext) throws Exception {
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("multicast1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -100,12 +102,12 @@ public class MessagingAddressTest extends TestBase {
                 .endSpec()
                 .build());
         clientRunner.sendAndReceive(endpoint, true, "multicast1", "multicast1", "multicast1", "multicast1");
-        assertDefaultMessaging(clientRunner.getClients());
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
     @Test
-    public void testQueue() throws Exception {
-        resourceManager.createResource(new MessagingAddressBuilder()
+    public void testQueue(ExtensionContext extensionContext) throws Exception {
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("queue1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -116,12 +118,12 @@ public class MessagingAddressTest extends TestBase {
                 .endSpec()
                 .build());
         clientRunner.sendAndReceive(endpoint, "queue1", "queue1");
-        assertDefaultMessaging(clientRunner.getClients());
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
     @Test
-    public void testDeadLetterExpiry() throws Exception {
-        resourceManager.createResource(new MessagingAddressBuilder()
+    public void testDeadLetterExpiry(ExtensionContext extensionContext) throws Exception {
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("dlq1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -131,7 +133,7 @@ public class MessagingAddressTest extends TestBase {
                 .endDeadLetter()
                 .endSpec()
                 .build());
-        resourceManager.createResource(new MessagingAddressBuilder()
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("queue1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -146,11 +148,11 @@ public class MessagingAddressTest extends TestBase {
         clientRunner.sendAndReceive(endpoint, false,
                 Collections.singletonMap(ClientArgument.MSG_TTL, "100"),
                 null, "queue1", "dlq1");
-        assertDefaultMessaging(clientRunner.getClients());
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
     @Test
-    public void testDeadLetterConsume() throws Exception {
+    public void testDeadLetterConsume(ExtensionContext extensionContext) throws Exception {
         MessagingEndpoint ingress = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
                 .withName("dlq")
@@ -163,8 +165,8 @@ public class MessagingAddressTest extends TestBase {
                 .addToProtocols("AMQP")
                 .endSpec()
                 .build();
-        resourceManager.createResource(ingress);
-        resourceManager.createResource(new MessagingAddressBuilder()
+        resourceManager.createResource(extensionContext, ingress);
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("dlq1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -174,7 +176,7 @@ public class MessagingAddressTest extends TestBase {
                 .endDeadLetter()
                 .endSpec()
                 .build());
-        resourceManager.createResource(new MessagingAddressBuilder()
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("queue1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -192,7 +194,7 @@ public class MessagingAddressTest extends TestBase {
                 .setQos(ProtonQoS.AT_LEAST_ONCE)
                 .setEndpoint(new Endpoint(ingress.getStatus().getHost(), ingress.getStatus().getPorts().get(0).getPort()))
                 .setProtonClientOptions(new ProtonClientOptions())
-                .setTerminusFactory(new QueueTerminusFactory()));
+                .setTerminusFactory(TerminusFactory.queue()));
 
         assertEquals(1, client.sendMessages("queue1", Collections.singletonList("todeadletter")).get(1, TimeUnit.MINUTES));
         Source source = new Source();
@@ -203,8 +205,8 @@ public class MessagingAddressTest extends TestBase {
     }
 
     @Test
-    public void testTopic() throws Exception {
-        resourceManager.createResource(new MessagingAddressBuilder()
+    public void testTopic(ExtensionContext extensionContext) throws Exception {
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                 .editOrNewMetadata()
                 .withName("topic1")
                 .withNamespace(project.getMetadata().getNamespace())
@@ -215,12 +217,12 @@ public class MessagingAddressTest extends TestBase {
                 .endSpec()
                 .build());
         clientRunner.sendAndReceive(endpoint, true, "topic1", "topic1", "topic1", "topic1");
-        assertDefaultMessaging(clientRunner.getClients());
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
     @Test
     @Disabled("Topic support not yet implemented")
-    void testTopicWildcards() throws Exception {
+    void testTopicWildcards(ExtensionContext extensionContext) throws Exception {
         MessagingEndpoint nodePort = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
                 .withNamespace(project.getMetadata().getNamespace())
@@ -245,14 +247,14 @@ public class MessagingAddressTest extends TestBase {
                 .endSpec()
                 .build();
 
-        resourceManager.createResource(nodePort, t0);
+        resourceManager.createResource(extensionContext, nodePort, t0);
 
         AmqpClient amqpClient = resourceManager.getAmqpClientFactory().createClient(new AmqpConnectOptions()
                 .setSaslMechanism("ANONYMOUS")
                 .setQos(ProtonQoS.AT_LEAST_ONCE)
                 .setEndpoint(new Endpoint(nodePort.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP", nodePort)))
                 .setProtonClientOptions(new ProtonClientOptions())
-                .setTerminusFactory(new TopicTerminusFactory()));
+                .setTerminusFactory(TerminusFactory.topic()));
 
         List<String> msgs = Arrays.asList("foo", "bar", "baz", "qux");
 
@@ -276,8 +278,8 @@ public class MessagingAddressTest extends TestBase {
     }
 
     @Test
-    public void testSubscription() throws Exception {
-        resourceManager.createResource(new MessagingAddressBuilder()
+    public void testSubscription(ExtensionContext extensionContext) throws Exception {
+        resourceManager.createResource(extensionContext, new MessagingAddressBuilder()
                         .editOrNewMetadata()
                         .withName("topic1")
                         .withNamespace(project.getMetadata().getNamespace())
@@ -311,19 +313,8 @@ public class MessagingAddressTest extends TestBase {
                         .build());
 
         clientRunner.sendAndReceive(endpoint, "topic1", "sub1", "sub2");
-        assertDefaultMessaging(clientRunner.getClients());
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    private void assertDefaultMessaging(List<ExternalMessagingClient> clients) throws InterruptedException {
-        int expectedMsgCount = 10;
-        for (ExternalMessagingClient client : clients) {
-            if (client.isSender()) {
-                assertEquals(expectedMsgCount, client.getMessages().size(),
-                        String.format("Expected %d sent messages", expectedMsgCount));
-            } else {
-                assertEquals(expectedMsgCount, client.getMessages().size(),
-                        String.format("Expected %d received messages", expectedMsgCount));
-            }
-        }
-    }
+
 }

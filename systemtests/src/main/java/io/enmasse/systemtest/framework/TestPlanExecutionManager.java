@@ -5,7 +5,9 @@
 package io.enmasse.systemtest.framework;
 
 import io.enmasse.systemtest.Environment;
+import io.enmasse.systemtest.logs.GlobalLogCollector;
 import io.enmasse.systemtest.operator.EnmasseOperatorManager;
+import io.enmasse.systemtest.utils.TestUtils;
 import org.junit.platform.launcher.TestExecutionListener;
 import org.junit.platform.launcher.TestPlan;
 import org.slf4j.Logger;
@@ -13,9 +15,8 @@ import org.slf4j.Logger;
 /**
  * Execution listener useful for safety cleanups of the test environment after test suite execution
  */
-public class TestPlanExecutionListener implements TestExecutionListener {
+public class TestPlanExecutionManager implements TestExecutionListener {
     private static final Logger LOGGER = LoggerUtils.getLogger();
-    EnmasseOperatorManager operator = EnmasseOperatorManager.getInstance();
     Environment env = Environment.getInstance();
 
     @Override
@@ -26,8 +27,19 @@ public class TestPlanExecutionListener implements TestExecutionListener {
 
     @Override
     public void testPlanExecutionFinished(TestPlan testPlan) {
-        if(!env.skipUninstall()) {
-            operator.deleteEnmasseBundle();
+        var tags = TestPlanInfo.getInstance().getTestRunTags();
+        if (tags != null && tags.size() == 1 && tags.get(0).equals(TestTag.FRAMEWORK)) {
+            LOGGER.info("Running framework tests, no cleanup performed");
+            return;
+        }
+
+        try {
+            if (!env.skipUninstall()) {
+                EnmasseOperatorManager.getInstance().deleteEnmasseBundle();
+            }
+        } catch (Exception | AssertionError ex) {
+            LOGGER.error(ex.getMessage());
+            GlobalLogCollector.saveInfraState(TestUtils.getLogsPath("EndOfTestSuite"));
         }
     }
 }

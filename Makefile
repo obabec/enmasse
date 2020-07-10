@@ -5,6 +5,7 @@ GO_DIRS = \
 	controller-manager \
 	iot/iot-proxy-configurator \
 	console/console-server \
+	access-control-server \
 	broker-plugin
 
 DOCKER_DIRS = \
@@ -22,9 +23,11 @@ GOOPTS          ?= -mod=vendor
 
 DOCKER_TARGETS   = docker_build docker_tag docker_push kind_load_image clean
 INSTALLDIR       = $(CURDIR)/templates/install
-SKIP_TESTS      ?= false
-SKIP_MANIFESTS  ?= false
-MAVEN_BATCH     ?= true
+
+SKIP_TESTS          ?= false
+SKIP_VERIFY_CODEGEN ?= false
+SKIP_MANIFESTS      ?= false
+MAVEN_BATCH         ?= true
 
 ifndef GOPATH
 	GOPATH=/tmp/go
@@ -66,10 +69,12 @@ test_go: test_go_vet test_go_codegen test_go_run
 endif
 
 test_go_codegen:
+ifeq ($(SKIP_VERIFY_CODEGEN),false)
 	GO111MODULE=on ./hack/verify-codegen.sh
+endif
 
 test_go_vet:
-	GO111MODULE=on go vet $(GOOPTS) ./cmd/... ./pkg/...
+	GO111MODULE=on time go vet $(GOOPTS) ./cmd/... ./pkg/...
 
 ifeq (,$(GO2XUNIT))
 test_go_run:

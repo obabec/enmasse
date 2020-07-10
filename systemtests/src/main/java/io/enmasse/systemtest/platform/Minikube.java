@@ -1,5 +1,5 @@
 /*
- * Copyright 2019, EnMasse authors.
+ * Copyright 2019-2020, EnMasse authors.
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
 package io.enmasse.systemtest.platform;
@@ -27,16 +27,16 @@ public class Minikube extends Kubernetes {
 
     private static final String OLM_NAMESPACE = "operators";
 
-    protected Minikube(Environment environment) {
-        super(environment, () -> {
+    protected Minikube() {
+        super(() -> {
             Config config = new ConfigBuilder().build();
             OkHttpClient httpClient = HttpClientUtils.createHttpClient(config);
             // Workaround https://github.com/square/okhttp/issues/3146
             httpClient = httpClient.newBuilder()
                     .protocols(Collections.singletonList(Protocol.HTTP_1_1))
-                    .connectTimeout(environment.getKubernetesApiConnectTimeout())
-                    .writeTimeout(environment.getKubernetesApiWriteTimeout())
-                    .readTimeout(environment.getKubernetesApiReadTimeout())
+                    .connectTimeout(Environment.getInstance().getKubernetesApiConnectTimeout())
+                    .writeTimeout(Environment.getInstance().getKubernetesApiWriteTimeout())
+                    .readTimeout(Environment.getInstance().getKubernetesApiReadTimeout())
                     .build();
             return new DefaultKubernetesClient(httpClient, config);
         });
@@ -93,7 +93,7 @@ public class Minikube extends Kubernetes {
             externalName += "-external";
         }
         Endpoint endpoint = new Endpoint(getIp(namespace, externalName), Integer.parseInt(getPort(namespace, externalName)));
-        log.info("Minikube external endpoint - " + endpoint.toString());
+        log.info("Minikube external endpoint - {}", endpoint);
         return endpoint;
     }
 

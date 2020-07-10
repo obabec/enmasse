@@ -10,7 +10,6 @@ import io.enmasse.systemtest.framework.TestLifecycleManager;
 import io.enmasse.systemtest.framework.TestTag;
 import io.enmasse.systemtest.messagingclients.MessagingClientRunner;
 import io.enmasse.systemtest.messaginginfra.ResourceManager;
-import io.enmasse.systemtest.platform.KubeCMDClient;
 import io.enmasse.systemtest.platform.Kubernetes;
 import io.enmasse.systemtest.utils.ThrowingCallable;
 import io.enmasse.systemtest.utils.ThrowingConsumer;
@@ -31,13 +30,10 @@ import java.util.List;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag(TestTag.SYSTEMTEST)
 public abstract class TestBase implements ITestSeparator {
-    protected static final Kubernetes kubernetes = Kubernetes.getInstance();
-    protected static final UserCredentials clusterUser = new UserCredentials(KubeCMDClient.getOCUser());
-    protected static final Environment environment = Environment.getInstance();
-    protected UserCredentials defaultCredentials = environment.getDefaultCredentials();
-    protected UserCredentials managementCredentials = environment.getManagementCredentials();
-    protected ResourceManager resourceManager = ResourceManager.getInstance();
-    protected MessagingClientRunner clientRunner = new MessagingClientRunner();
+    protected final Environment environment = Environment.getInstance();
+    protected final Kubernetes kubernetes = Kubernetes.getInstance();
+    protected final ResourceManager resourceManager = ResourceManager.getInstance();
+    protected final MessagingClientRunner clientRunner = new MessagingClientRunner();
 
 
     protected List<ThrowingCallable> cleanup = new LinkedList<>();

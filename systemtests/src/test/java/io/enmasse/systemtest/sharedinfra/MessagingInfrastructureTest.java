@@ -19,8 +19,10 @@ import io.enmasse.systemtest.framework.annotations.DefaultMessagingProject;
 import io.enmasse.systemtest.framework.annotations.ExternalClients;
 import io.enmasse.systemtest.messaginginfra.resources.MessagingInfrastructureResourceType;
 import io.enmasse.systemtest.time.TimeoutBudget;
+import io.enmasse.systemtest.utils.AssertionUtils;
 import io.enmasse.systemtest.utils.TestUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtensionContext;
 import org.slf4j.Logger;
 
 import java.time.Duration;
@@ -39,7 +41,7 @@ public class MessagingInfrastructureTest extends TestBase {
      * in the underlying pods.
      */
     @Test
-    public void testInfraStaticScalingStrategy() throws Exception {
+    public void testInfraStaticScalingStrategy(ExtensionContext extensionContext) throws Exception {
         MessagingInfrastructure infra = new MessagingInfrastructureBuilder()
                 .withNewMetadata()
                 .withName("default-infra")
@@ -49,7 +51,7 @@ public class MessagingInfrastructureTest extends TestBase {
                 .endSpec()
                 .build();
 
-        resourceManager.createResource(infra);
+        resourceManager.createResource(extensionContext, infra);
 
         waitForConditionsTrue(infra);
 
@@ -76,7 +78,7 @@ public class MessagingInfrastructureTest extends TestBase {
                 .endSpec()
                 .build();
 
-        resourceManager.createResource(infra);
+        resourceManager.createResource(extensionContext, infra);
 
         assertTrue(resourceManager.waitResourceCondition(infra, i -> i.getStatus() != null && i.getStatus().getBrokers() != null && i.getStatus().getBrokers().size() == 2));
         assertTrue(resourceManager.waitResourceCondition(infra, i -> i.getStatus() != null && i.getStatus().getRouters() != null && i.getStatus().getRouters().size() == 3));
@@ -106,7 +108,7 @@ public class MessagingInfrastructureTest extends TestBase {
                 .endBroker()
                 .endSpec()
                 .build();
-        resourceManager.createResource(infra);
+        resourceManager.createResource(extensionContext, infra);
 
         assertTrue(resourceManager.waitResourceCondition(infra, i -> i.getStatus() != null && i.getStatus().getBrokers() != null && i.getStatus().getBrokers().size() == 1));
         assertTrue(resourceManager.waitResourceCondition(infra, i -> i.getStatus() != null && i.getStatus().getRouters() != null && i.getStatus().getRouters().size() == 2));
@@ -126,7 +128,7 @@ public class MessagingInfrastructureTest extends TestBase {
     @ExternalClients
     @DefaultMessagingInfrastructure
     @DefaultMessagingProject
-    public void testInfraRestart() throws Exception {
+    public void testInfraRestart(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
 
         MessagingAddress queue = new MessagingAddressBuilder()
@@ -163,12 +165,14 @@ public class MessagingInfrastructureTest extends TestBase {
                 .endSpec()
                 .build();
 
-        resourceManager.createResource(endpoint, anycast, queue);
+        resourceManager.createResource(extensionContext, endpoint, anycast, queue);
 
         // Make sure endpoints work first
         LOGGER.info("Running initial client check");
-        MessagingEndpointTest.doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), anycast.getMetadata().getName(), false, false);
-        MessagingEndpointTest.doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), queue.getMetadata().getName(), false, false);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), anycast.getMetadata().getName(), false, false);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), queue.getMetadata().getName(), false, false);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
+        clientRunner.cleanClients();
 
         // Restart router and broker pods
         MessagingInfrastructure defaultInfra = resourceManager.getDefaultInfra();
@@ -181,8 +185,9 @@ public class MessagingInfrastructureTest extends TestBase {
         assertTrue(resourceManager.waitResourceCondition(defaultInfra, i -> i.getStatus() != null && i.getStatus().getRouters() != null && i.getStatus().getRouters().size() == 1));
         waitForConditionsTrue(defaultInfra);
 
-        MessagingEndpointTest.doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), anycast.getMetadata().getName(), false, false);
-        MessagingEndpointTest.doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), queue.getMetadata().getName(), false, false);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), anycast.getMetadata().getName(), false, false);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), endpoint.getStatus().getPorts().get(0).getPort(), queue.getMetadata().getName(), false, false);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
     private void waitForConditionsTrue(MessagingInfrastructure infra) {

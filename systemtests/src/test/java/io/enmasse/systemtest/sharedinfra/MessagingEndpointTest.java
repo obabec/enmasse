@@ -11,11 +11,8 @@ import io.enmasse.api.model.MessagingEndpoint;
 import io.enmasse.api.model.MessagingEndpointBuilder;
 import io.enmasse.api.model.MessagingEndpointCondition;
 import io.enmasse.api.model.MessagingProject;
-import io.enmasse.systemtest.Endpoint;
 import io.enmasse.systemtest.TestBase;
 import io.enmasse.systemtest.amqp.AmqpClient;
-import io.enmasse.systemtest.amqp.AmqpConnectOptions;
-import io.enmasse.systemtest.amqp.QueueTerminusFactory;
 import io.enmasse.systemtest.certs.CertBundle;
 import io.enmasse.systemtest.certs.openssl.OpenSSLUtil;
 import io.enmasse.systemtest.condition.Kubernetes;
@@ -24,40 +21,26 @@ import io.enmasse.systemtest.condition.OpenShiftVersion;
 import io.enmasse.systemtest.framework.annotations.DefaultMessagingInfrastructure;
 import io.enmasse.systemtest.framework.annotations.DefaultMessagingProject;
 import io.enmasse.systemtest.framework.annotations.ExternalClients;
-import io.enmasse.systemtest.messagingclients.ClientArgument;
-import io.enmasse.systemtest.messagingclients.ExternalMessagingClient;
-import io.enmasse.systemtest.messagingclients.proton.java.ProtonJMSClientReceiver;
-import io.enmasse.systemtest.messagingclients.proton.java.ProtonJMSClientSender;
-import io.enmasse.systemtest.messagingclients.rhea.RheaClientReceiver;
-import io.enmasse.systemtest.messagingclients.rhea.RheaClientSender;
+import io.enmasse.systemtest.framework.annotations.ParallelTest;
 import io.enmasse.systemtest.messaginginfra.resources.MessagingAddressResourceType;
 import io.enmasse.systemtest.messaginginfra.resources.MessagingEndpointResourceType;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.net.PemTrustOptions;
-import io.vertx.proton.ProtonClientOptions;
-import io.vertx.proton.ProtonQoS;
+import io.enmasse.systemtest.utils.AssertionUtils;
 import org.apache.qpid.proton.amqp.messaging.AmqpValue;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DefaultMessagingInfrastructure
 @DefaultMessagingProject
 @ExternalClients
 public class MessagingEndpointTest extends TestBase {
-
-    @Test
-    public void testNodePortEndpoint() throws Exception {
+    @ParallelTest
+    public void testNodePortEndpoint(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -72,14 +55,13 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue1");
-
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP", endpoint), "queue1", false, false);
-
+        createEndpointsAndAddress(extensionContext, "queue1", project.getMetadata().getNamespace(), endpoint);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP", endpoint), "queue1", false, false);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
-    public void testClusterEndpoint() throws Exception {
+    @ParallelTest
+    public void testClusterEndpoint(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -97,15 +79,16 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue2");
+        createEndpointsAndAddress(extensionContext, "queue2", project.getMetadata().getNamespace(), endpoint);
 
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP", endpoint), "queue2", false, false);
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue2", true, false);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP", endpoint), "queue2", false, false);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue2", true, false);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
+    @ParallelTest
     @OpenShift
-    public void testRouteEndpoint() throws Exception {
+    public void testRouteEndpoint(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -123,18 +106,20 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue3");
+        createEndpointsAndAddress(extensionContext, "queue3", project.getMetadata().getNamespace(), endpoint);
 
         endpoint = MessagingEndpointResourceType.getOperation().inNamespace(endpoint.getMetadata().getNamespace()).withName(endpoint.getMetadata().getName()).get();
         assertNotNull(endpoint.getStatus().getTls());
         assertNotNull(endpoint.getStatus().getTls().getCaCertificate());
 
-        doTestSendReceiveOutsideCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue3", true, true, endpoint.getStatus().getTls().getCaCertificate());
+        AmqpClient client = clientRunner.sendReceiveOutsideCluster(endpoint.getStatus().getHost(),
+                MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue3", true, true, endpoint.getStatus().getTls().getCaCertificate());
+        assertMessagingOutside(client, "queue3");
     }
 
-    @Test
+    @ParallelTest
     @Kubernetes
-    public void testLoadBalancerEndpoint() throws Exception {
+    public void testLoadBalancerEndpoint(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -149,17 +134,19 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue4");
+        createEndpointsAndAddress(extensionContext, "queue4", project.getMetadata().getNamespace(), endpoint);
 
-        doTestSendReceiveOutsideCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP", endpoint), "queue4", false, false, null);
+        AmqpClient client = clientRunner.sendReceiveOutsideCluster(endpoint.getStatus().getHost(),
+                MessagingEndpointResourceType.getPort("AMQP", endpoint), "queue4", false, false, null);
+        assertMessagingOutside(client, "queue4");
     }
 
     /**
      * Test requires ingress controller with SSL passthrough enabled.
      */
-    @Test
+    @ParallelTest
     @Kubernetes
-    public void testIngressEndpoint() throws Exception {
+    public void testIngressEndpoint(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -179,18 +166,20 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue5");
+        createEndpointsAndAddress(extensionContext, "queue5", project.getMetadata().getNamespace(), endpoint);
 
         endpoint = MessagingEndpointResourceType.getOperation().inNamespace(endpoint.getMetadata().getNamespace()).withName(endpoint.getMetadata().getName()).get();
         assertNotNull(endpoint.getStatus().getTls());
         assertNotNull(endpoint.getStatus().getTls().getCaCertificate());
 
-        doTestSendReceiveOutsideCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue5", true, true, endpoint.getStatus().getTls().getCaCertificate());
+        AmqpClient client = clientRunner.sendReceiveOutsideCluster(endpoint.getStatus().getHost(),
+                MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue5", true, true, endpoint.getStatus().getTls().getCaCertificate());
+        assertMessagingOutside(client, "queue5");
     }
 
-    @Test
+    @ParallelTest
     @OpenShift(version = OpenShiftVersion.OCP4)
-    public void testOpenShiftCert() throws Exception {
+    public void testOpenShiftCert(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -208,13 +197,14 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue6");
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue6", true, false);
+        createEndpointsAndAddress(extensionContext, "queue6", project.getMetadata().getNamespace(), endpoint);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue6", true, false);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
+    @ParallelTest
     @OpenShift
-    public void testSelfsignedCert() throws Exception {
+    public void testSelfsignedCert(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -232,7 +222,7 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue7");
+        createEndpointsAndAddress(extensionContext, "queue7", project.getMetadata().getNamespace(), endpoint);
 
         endpoint = MessagingEndpointResourceType.getOperation().inNamespace(endpoint.getMetadata().getNamespace()).withName(endpoint.getMetadata().getName()).get();
         assertNotNull(endpoint.getStatus().getTls());
@@ -243,12 +233,14 @@ public class MessagingEndpointTest extends TestBase {
         assertFalse(endpoint.getStatus().getTls().getCertificateValidity().getNotBefore().isEmpty());
         assertFalse(endpoint.getStatus().getTls().getCertificateValidity().getNotAfter().isEmpty());
 
-        doTestSendReceiveOutsideCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue7", true, true, endpoint.getStatus().getTls().getCaCertificate());
+        AmqpClient client = clientRunner.sendReceiveOutsideCluster(endpoint.getStatus().getHost(),
+                MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue7", true, true, endpoint.getStatus().getTls().getCaCertificate());
+        assertMessagingOutside(client, "queue7");
     }
 
-    @Test
+    @ParallelTest
     @OpenShift
-    public void testExternalCert() throws Exception {
+    public void testExternalCert(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         CertBundle messagingCert = OpenSSLUtil.createCertBundle("messaging.example.com");
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
@@ -273,7 +265,7 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue8");
+        createEndpointsAndAddress(extensionContext, "queue8", project.getMetadata().getNamespace(), endpoint);
 
         endpoint = MessagingEndpointResourceType.getOperation().inNamespace(endpoint.getMetadata().getNamespace()).withName(endpoint.getMetadata().getName()).get();
         assertNotNull(endpoint.getStatus().getTls());
@@ -282,11 +274,13 @@ public class MessagingEndpointTest extends TestBase {
         assertNotNull(endpoint.getStatus().getTls().getCertificateValidity().getNotAfter());
 
         // Disable host verification as we cant verify that. However as long as cert is valid that should be sufficient to validate it is being set correctly.
-        doTestSendReceiveOutsideCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue8", true, false, messagingCert.getCaCert());
+        AmqpClient client = clientRunner.sendReceiveOutsideCluster(endpoint.getStatus().getHost(),
+                MessagingEndpointResourceType.getPort("AMQPS", endpoint), "queue8", true, false, messagingCert.getCaCert());
+        assertMessagingOutside(client, "queue8");
     }
 
-    @Test
-    public void testClusterEndpointWebsockets() throws Exception {
+    @ParallelTest
+    public void testClusterEndpointWebsockets(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -304,15 +298,16 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue9");
+        createEndpointsAndAddress(extensionContext, "queue9", project.getMetadata().getNamespace(), endpoint);
 
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WS", endpoint), "queue9", false, true);
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue9", true, true);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(),MessagingEndpointResourceType.getPort("AMQP-WS", endpoint), "queue9", false, true);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue9", true, true);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
+    @ParallelTest
     @Kubernetes
-    public void testIngressEndpointWebsocket() throws Exception {
+    public void testIngressEndpointWebsocket(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -327,13 +322,14 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue10");
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WS", endpoint), "queue10", false, true);
+        createEndpointsAndAddress(extensionContext, "queue10", project.getMetadata().getNamespace(), endpoint);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WS", endpoint), "queue10", false, true);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
+    @ParallelTest
     @OpenShift
-    public void testRouteEndpointWebsocket() throws Exception {
+    public void testRouteEndpointWebsocket(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -347,13 +343,14 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue11");
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WS", endpoint), "queue11", false, true);
+        createEndpointsAndAddress(extensionContext, "queue11", project.getMetadata().getNamespace(), endpoint);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WS", endpoint), "queue11", false, true);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
+    @ParallelTest
     @OpenShift
-    public void testRouteEndpointWebsocketTlsPassthrough() throws Exception {
+    public void testRouteEndpointWebsocketTlsPassthrough(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -371,13 +368,14 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue12");
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue12", true, true);
+        createEndpointsAndAddress(extensionContext, "queue12", project.getMetadata().getNamespace(), endpoint);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue12", true, true);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
+    @ParallelTest
     @OpenShift(version = OpenShiftVersion.OCP3)
-    public void testRouteEndpointWebsocketTlsReencrypt() throws Exception {
+    public void testRouteEndpointWebsocketTlsReencrypt(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -396,13 +394,51 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue13");
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue13", true, true);
+        createEndpointsAndAddress(extensionContext, "queue13", project.getMetadata().getNamespace(), endpoint);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue13", true, true);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    @Test
+    @ParallelTest
+    @Disabled("Awaiting fixes in DISPATCH-1585 to allow endpoints to use same addresses")
+    public void testMultipleEndpoints(ExtensionContext extensionContext) throws Exception {
+        MessagingProject project = resourceManager.getDefaultMessagingProject();
+
+        MessagingEndpoint endpoint1 = new MessagingEndpointBuilder()
+                .editOrNewMetadata()
+                .withNamespace(project.getMetadata().getNamespace())
+                .withName("endpoint1")
+                .endMetadata()
+                .editOrNewSpec()
+                .editOrNewCluster()
+                .endCluster()
+                .addToProtocols("AMQP")
+                .endSpec()
+                .build();
+
+        MessagingEndpoint endpoint2 = new MessagingEndpointBuilder()
+                .editOrNewMetadata()
+                .withNamespace(project.getMetadata().getNamespace())
+                .withName("endpoint2")
+                .endMetadata()
+                .editOrNewSpec()
+                .editOrNewCluster()
+                .endCluster()
+                .addToProtocols("AMQP")
+                .endSpec()
+                .build();
+
+        createEndpointsAndAddress(extensionContext, "queue14", project.getMetadata().getNamespace(), endpoint1, endpoint2);
+
+        clientRunner.send(endpoint1, "queue14");
+        clientRunner.receive(endpoint2, "queue14");
+
+        AssertionUtils.assertDefaultMessaging(clientRunner);
+    }
+
+    @ParallelTest
     @OpenShift
-    public void testRouteEndpointWebsocketTlsEdge() throws Exception {
+    public void testRouteEndpointWebsocketTlsEdge(ExtensionContext extensionContext) throws Exception {
         MessagingProject project = resourceManager.getDefaultMessagingProject();
         MessagingEndpoint endpoint = new MessagingEndpointBuilder()
                 .editOrNewMetadata()
@@ -417,89 +453,21 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        createEndpointAndAddress(endpoint, "queue14");
-        doTestSendReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue14", true, true);
+        createEndpointsAndAddress(extensionContext, "queue15", project.getMetadata().getNamespace(), endpoint);
+        clientRunner.sendAndReceiveOnCluster(endpoint.getStatus().getHost(), MessagingEndpointResourceType.getPort("AMQP-WSS", endpoint), "queue15", true, true);
+        AssertionUtils.assertDefaultMessaging(clientRunner);
     }
 
-    private void doTestSendReceiveOutsideCluster(String host, int port, String address, boolean tls, boolean verifyHost, String caCert) throws Exception {
-        ProtonClientOptions protonClientOptions = new ProtonClientOptions();
-        if (tls) {
-            protonClientOptions.setSsl(true);
-            if (!verifyHost) {
-                protonClientOptions.setHostnameVerificationAlgorithm("");
-            }
-            if (caCert != null) {
-                protonClientOptions.setTrustOptions(new PemTrustOptions()
-                        .addCertValue(Buffer.buffer(caCert)));
-            }
-        }
-        AmqpClient client = resourceManager.getAmqpClientFactory().createClient(new AmqpConnectOptions()
-                .setSaslMechanism("ANONYMOUS")
-                .setQos(ProtonQoS.AT_LEAST_ONCE)
-                .setEndpoint(new Endpoint(host, port))
-                .setProtonClientOptions(protonClientOptions)
-                .setTerminusFactory(new QueueTerminusFactory()));
-
-        assertEquals(1, client.sendMessages(address, Collections.singletonList("hello")).get(1, TimeUnit.MINUTES));
+    private void assertMessagingOutside(AmqpClient client, String address) throws ExecutionException, InterruptedException {
         var result = client.recvMessages(address, 1).get();
         assertEquals(1, result.size());
         assertEquals("hello", ((AmqpValue) result.get(0).getBody()).getValue());
-        client.close();
     }
 
-    static void doTestSendReceiveOnCluster(String host, int port, String address, boolean enableTls, boolean websockets) throws Exception {
-        assertTrue(port > 0);
-        int expectedMsgCount = 10;
-
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            Endpoint e = new Endpoint(host, port);
-            ExternalMessagingClient senderClient = new ExternalMessagingClient(enableTls)
-                    .withClientEngine(websockets ? new RheaClientSender() : new ProtonJMSClientSender())
-                    .withMessagingRoute(e)
-                    .withAddress(address)
-                    .withCount(expectedMsgCount)
-                    .withMessageBody("msg no. %d")
-                    .withAdditionalArgument(ClientArgument.CONN_AUTH_MECHANISM, "ANONYMOUS")
-                    .withTimeout(30);
-
-            ExternalMessagingClient receiverClient = new ExternalMessagingClient(enableTls)
-                    .withClientEngine(websockets ? new RheaClientReceiver() : new ProtonJMSClientReceiver())
-                    .withMessagingRoute(e)
-                    .withAddress(address)
-                    .withCount(expectedMsgCount)
-                    .withAdditionalArgument(ClientArgument.CONN_AUTH_MECHANISM, "ANONYMOUS")
-                    .withTimeout(30);
-
-/*        if (enableTls) {
-            senderClient.withAdditionalArgument(ClientArgument.CONN_SSL_VERIFY_PEER_NAME, true);
-        }*/
-            if (websockets) {
-                senderClient.withAdditionalArgument(ClientArgument.CONN_WEB_SOCKET, true);
-                receiverClient.withAdditionalArgument(ClientArgument.CONN_WEB_SOCKET, true);
-                senderClient.withAdditionalArgument(ClientArgument.CONN_WEB_SOCKET_PROTOCOLS, "binary");
-                receiverClient.withAdditionalArgument(ClientArgument.CONN_WEB_SOCKET_PROTOCOLS, "binary");
-            }
-
-            List<Future<Boolean>> results = executor.invokeAll(List.of(senderClient::run, receiverClient::run));
-
-            assertTrue(results.get(0).get(1, TimeUnit.MINUTES), "Sender failed, expected return code 0");
-            assertTrue(results.get(1).get(1, TimeUnit.MINUTES), "Receiver failed, expected return code 0");
-
-            assertEquals(expectedMsgCount, senderClient.getMessages().size(),
-                    String.format("Expected %d sent messages", expectedMsgCount));
-            assertEquals(expectedMsgCount, receiverClient.getMessages().size(),
-                    String.format("Expected %d received messages", expectedMsgCount));
-        } finally {
-            executor.shutdown();
-            executor.awaitTermination(1, TimeUnit.MINUTES);
-        }
-    }
-
-    private void createEndpointAndAddress(MessagingEndpoint endpoint, String addressName) {
+    private void createEndpointsAndAddress(ExtensionContext extensionContext, String addressName, String namespace, MessagingEndpoint... endpoints) throws InterruptedException {
         MessagingAddress address = new MessagingAddressBuilder()
                 .editOrNewMetadata()
-                .withNamespace(endpoint.getMetadata().getNamespace())
+                .withNamespace(namespace)
                 .withName(addressName)
                 .endMetadata()
                 .editOrNewSpec()
@@ -508,12 +476,15 @@ public class MessagingEndpointTest extends TestBase {
                 .endSpec()
                 .build();
 
-        resourceManager.createResource(endpoint, address);
+        resourceManager.createResource(extensionContext, endpoints);
+        resourceManager.createResource(extensionContext, address);
 
-        endpoint = MessagingEndpointResourceType.getOperation().inNamespace(endpoint.getMetadata().getNamespace()).withName(endpoint.getMetadata().getName()).get();
-        MessagingEndpointCondition endpointCondition = MessagingEndpointResourceType.getCondition(endpoint.getStatus().getConditions(), "Ready");
-        assertNotNull(endpointCondition);
-        assertEquals("True", endpointCondition.getStatus());
+        for (MessagingEndpoint endpoint : endpoints) {
+            endpoint = MessagingEndpointResourceType.getOperation().inNamespace(endpoint.getMetadata().getNamespace()).withName(endpoint.getMetadata().getName()).get();
+            MessagingEndpointCondition endpointCondition = MessagingEndpointResourceType.getCondition(endpoint.getStatus().getConditions(), "Ready");
+            assertNotNull(endpointCondition);
+            assertEquals("True", endpointCondition.getStatus());
+        }
 
         address = MessagingAddressResourceType.getOperation().inNamespace(address.getMetadata().getNamespace()).withName(address.getMetadata().getName()).get();
         MessagingAddressCondition addressCondition = MessagingAddressResourceType.getCondition(address.getStatus().getConditions(), "Ready");
